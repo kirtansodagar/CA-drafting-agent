@@ -14,6 +14,14 @@ def _headers() -> dict[str, str]:
     return {"X-API-Key": "test-api-key"}
 
 
+def test_web_frontend_is_served() -> None:
+    """The professional browser frontend is served by FastAPI."""
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "CA Drafting Agent" in response.text
+
+
 def test_agent_endpoint_rejects_missing_api_key(monkeypatch) -> None:
     """State-changing endpoints require the shared API key."""
     monkeypatch.setenv("APP_API_KEY", "test-api-key")

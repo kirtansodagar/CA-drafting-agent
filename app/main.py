@@ -9,6 +9,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.agent import continue_document_session, start_document_session
 from app.config import MAX_UPLOAD_BYTES, get_allowed_origins, get_app_api_key
@@ -17,6 +18,7 @@ from app.parser import parse_document
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = BASE_DIR / "uploads"
+WEB_DIR = BASE_DIR / "web"
 
 app = FastAPI(title="CA Document Drafter", version="1.0.0")
 
@@ -212,3 +214,7 @@ async def agent_message(
         "client_name": result.get("client_name", ""),
         "review_required": True,
     }
+
+
+if WEB_DIR.exists():
+    app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")

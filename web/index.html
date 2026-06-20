@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CA Drafting Agent</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CA</div>
+          <div>
+            <div class="brand-title">Drafting Agent</div>
+            <div class="brand-subtitle">Tax document workbench</div>
+          </div>
+        </div>
+
+        <section class="panel">
+          <div class="panel-label">Connection</div>
+          <label for="apiKey">Backend API key</label>
+          <input id="apiKey" type="password" autocomplete="off" placeholder="APP_API_KEY" />
+          <button id="saveKey" class="secondary-button" type="button">Save key locally</button>
+          <p class="microcopy">Stored only in this browser with localStorage.</p>
+        </section>
+
+        <section class="panel">
+          <div class="panel-label">Case intake</div>
+          <label for="clientName">Client name</label>
+          <input id="clientName" type="text" placeholder="Example: Mr. Sharma" />
+
+          <label class="file-zone" for="pdfFile" id="dropZone">
+            <span class="file-zone-title">Upload tax PDF</span>
+            <span class="file-zone-meta" id="fileName">Form 26AS, ITR summary, or notice</span>
+            <input id="pdfFile" type="file" accept="application/pdf,.pdf" />
+          </label>
+
+          <label class="check-row">
+            <input id="consent" type="checkbox" />
+            <span>I understand extracted tax text will be sent to Groq for draft generation.</span>
+          </label>
+
+          <button id="startReview" class="primary-button" type="button">Start agent review</button>
+        </section>
+
+        <section class="status-panel">
+          <div class="status-dot" id="statusDot"></div>
+          <div>
+            <div class="status-title" id="statusTitle">Ready</div>
+            <div class="status-text" id="statusText">Upload a document to begin.</div>
+          </div>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <header class="hero">
+          <div>
+            <p class="eyebrow">Human-reviewed AI drafting</p>
+            <h1>Prepare CA client communication with source-aware review notes.</h1>
+          </div>
+          <div class="hero-actions">
+            <button id="copyDraft" class="secondary-button" type="button" disabled>Copy draft</button>
+            <button id="downloadDraft" class="secondary-button" type="button" disabled>Download</button>
+          </div>
+        </header>
+
+        <section class="case-strip">
+          <div class="metric">
+            <span>Document</span>
+            <strong id="docType">Not analyzed</strong>
+          </div>
+          <div class="metric">
+            <span>Source length</span>
+            <strong id="charCount">0 chars</strong>
+          </div>
+          <div class="metric">
+            <span>Review state</span>
+            <strong>CA approval required</strong>
+          </div>
+        </section>
+
+        <section class="content-grid">
+          <div class="document-panel">
+            <div class="tabs" role="tablist">
+              <button class="tab active" data-tab="draft" type="button">Draft</button>
+              <button class="tab" data-tab="checklist" type="button">Checklist</button>
+            </div>
+            <div id="draftPane" class="text-surface active">
+              <div class="empty-state">The generated draft will appear here.</div>
+            </div>
+            <div id="checklistPane" class="text-surface">
+              <div class="empty-state">Verification points and missing documents will appear here.</div>
+            </div>
+          </div>
+
+          <aside class="chat-panel">
+            <div class="chat-header">
+              <div>
+                <div class="panel-label">Agent chat</div>
+                <h2>Refine the draft</h2>
+              </div>
+            </div>
+            <div id="chatMessages" class="chat-messages">
+              <div class="message assistant">
+                <div class="message-role">Agent</div>
+                <div>Upload a document first, then ask for revisions such as making the draft shorter or adding a deadline reminder.</div>
+              </div>
+            </div>
+            <form id="chatForm" class="chat-form">
+              <input id="chatInput" type="text" placeholder="Ask for a revision..." disabled />
+              <button id="sendChat" class="primary-button compact" type="submit" disabled>Send</button>
+            </form>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
