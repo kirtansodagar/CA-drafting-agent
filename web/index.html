@@ -26,6 +26,16 @@
         </section>
 
         <section class="panel">
+          <div class="panel-row">
+            <div class="panel-label">Saved cases</div>
+            <button id="refreshCases" class="icon-button" type="button" title="Refresh cases">Refresh</button>
+          </div>
+          <div id="caseList" class="case-list">
+            <div class="case-empty">Save your API key, then refresh cases.</div>
+          </div>
+        </section>
+
+        <section class="panel">
           <div class="panel-label">Case intake</div>
           <label for="clientName">Client name</label>
           <input id="clientName" type="text" placeholder="Example: Mr. Sharma" />

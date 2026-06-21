@@ -1,6 +1,6 @@
 # CA Drafting Agent
 
-Streamlit and FastAPI app that helps Indian CA firms draft client-facing letters from tax PDFs. The app now runs as a chat-style drafting agent: upload a PDF, review the generated draft and checklist, then ask for revisions in natural language.
+Streamlit and FastAPI app that helps Indian CA firms draft client-facing letters from tax PDFs. The primary UI is now a FastAPI-served browser workbench: upload a PDF, review the generated draft and checklist, reopen saved cases, then ask for revisions in natural language.
 
 All output is draft material for CA review. Verify facts, amounts, deadlines, and client-specific advice before sharing anything externally.
 
@@ -41,11 +41,14 @@ The frontend reads `APP_API_KEY` and `API_AGENT_URL` from Streamlit secrets or e
 2. Upload a supported tax PDF.
 3. Confirm consent that extracted tax text will be sent to Groq for generation.
 4. Review the detected document type, draft letter, and verification checklist.
-5. Use the chat tab to request revisions.
+5. Reopen saved cases from the sidebar when needed.
+6. Use the chat panel to request revisions.
 
 ## Backend Endpoints
 
 - `GET /health`: health check and configured model name.
+- `GET /cases`: list persisted drafting cases.
+- `GET /cases/{case_id}`: load one persisted case with chat messages.
 - `POST /upload`: backwards-compatible single-shot upload endpoint.
 - `POST /agent/message`: agent endpoint for document intake and follow-up revisions.
 
@@ -64,7 +67,7 @@ State-changing endpoints require the `X-API-Key` header matching `APP_API_KEY`.
 - Uploads are limited to 25 MB.
 - Uploads must have a `.pdf` filename and PDF file header.
 - CORS is restricted through `ALLOWED_ORIGINS`.
-- The app uses session-only in-memory agent state; case data is not persisted by the app.
+- Case data is persisted locally in SQLite under `data/ca_agent.db`; this file is ignored by Git.
 - Scanned or image-based PDFs are not supported in v1 because the app uses text extraction only and does not include OCR.
 
 ## Troubleshooting

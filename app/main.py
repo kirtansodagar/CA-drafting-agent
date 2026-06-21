@@ -11,16 +11,29 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadF
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.agent import continue_document_session, start_document_session
+from app.agent import (
+    continue_document_session,
+    restore_document_session,
+    start_document_session,
+)
 from app.config import MAX_UPLOAD_BYTES, get_allowed_origins, get_app_api_key
 from app.generator import MODEL_NAME, generate_draft
 from app.parser import parse_document
+from app.storage import (
+    append_case_revision,
+    create_or_replace_case,
+    get_case,
+    get_case_by_session,
+    init_db,
+    list_cases,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = BASE_DIR / "uploads"
 WEB_DIR = BASE_DIR / "web"
 
 app = FastAPI(title="CA Document Drafter", version="1.0.0")
+init_db()
 
 app.add_middleware(
     CORSMiddleware,
@@ -92,6 +105,21 @@ def _delete_uploaded_file(file_path: Path) -> None:
 def health() -> dict[str, str]:
     """Return the API health status and configured Groq model name."""
     return {"status": "ok", "model": MODEL_NAME}
+
+
+@app.get("/cases")
+def cases(_: None = Depends(require_api_key)) -> dict[str, Any]:
+    """Return persisted drafting cases."""
+    return {"cases": list_cases()}
+
+
+@app.get("/cases/{case_id}")
+def case_detail(case_id: str, _: None = Depends(require_api_key)) -> dict[str, Any]:
+    """Return a persisted drafting case with messages."""
+    case = get_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    return {"case": case}
 
 
 @app.post("/upload")
@@ -183,7 +211,20 @@ async def agent_message(
             if "error" in result:
                 raise HTTPException(status_code=422, detail=result["error"])
 
+            case = create_or_replace_case(
+                session_id=session_id.strip(),
+                client_name=client_name.strip(),
+                doc_type=result.get("doc_type", parsed_document["doc_type"]),
+                filename=parsed_document["file_name"],
+                char_count=parsed_document["char_count"],
+                extracted_text=parsed_document["text"],
+                draft=result.get("draft", ""),
+                checklist=result.get("checklist", ""),
+                assistant_message=result.get("assistant_message", ""),
+            )
+
             return {
+                "case_id": case.get("id", ""),
                 "session_id": session_id.strip(),
                 "assistant_message": result.get("assistant_message", ""),
                 "draft": result.get("draft", ""),
@@ -202,10 +243,32 @@ async def agent_message(
         raise HTTPException(status_code=422, detail="Message is required.")
 
     result = continue_document_session(session_id.strip(), message.strip())
+    if "error" in result and "Session not found" in result["error"]:
+        saved_case = get_case_by_session(session_id.strip())
+        if saved_case:
+            restore_document_session(
+                session_id=saved_case["session_id"],
+                client_name=saved_case["client_name"],
+                doc_type=saved_case["doc_type"],
+                extracted_text=saved_case["extracted_text"],
+                current_draft=saved_case["draft"],
+                checklist=saved_case["checklist"],
+            )
+            result = continue_document_session(session_id.strip(), message.strip())
+
     if "error" in result:
         raise HTTPException(status_code=422, detail=result["error"])
 
+    case = append_case_revision(
+        session_id=session_id.strip(),
+        user_message=message.strip(),
+        assistant_message=result.get("assistant_message", ""),
+        draft=result.get("draft", ""),
+        checklist=result.get("checklist", ""),
+    )
+
     return {
+        "case_id": case.get("id", ""),
         "session_id": session_id.strip(),
         "assistant_message": result.get("assistant_message", ""),
         "draft": result.get("draft", ""),

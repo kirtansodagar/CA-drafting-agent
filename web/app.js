@@ -7,6 +7,8 @@ const state = {
 const elements = {
   apiKey: document.querySelector("#apiKey"),
   saveKey: document.querySelector("#saveKey"),
+  refreshCases: document.querySelector("#refreshCases"),
+  caseList: document.querySelector("#caseList"),
   clientName: document.querySelector("#clientName"),
   pdfFile: document.querySelector("#pdfFile"),
   dropZone: document.querySelector("#dropZone"),
@@ -79,6 +81,16 @@ async function postAgent(formData) {
   return response.json();
 }
 
+async function getJson(path) {
+  const response = await fetch(path, {
+    headers: { "X-API-Key": apiKey() },
+  });
+  if (!response.ok) {
+    throw new Error(await parseError(response));
+  }
+  return response.json();
+}
+
 function formatDocType(docType) {
   const labels = {
     form_26as: "Form 26AS",
@@ -89,12 +101,24 @@ function formatDocType(docType) {
   return labels[docType] || docType || "Unknown";
 }
 
+function formatDate(value) {
+  if (!value) {
+    return "";
+  }
+  const parsed = new Date(`${value}Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
+}
+
 function textOrEmpty(value, fallback) {
   return value && value.trim() ? value : fallback;
 }
 
 function renderPayload(payload) {
   state.payload = payload;
+  state.sessionId = payload.session_id || state.sessionId;
   elements.docType.textContent = formatDocType(payload.doc_type);
   elements.charCount.textContent = `${payload.char_count || 0} chars`;
   elements.draftPane.textContent = textOrEmpty(payload.draft, "No draft returned.");
@@ -103,6 +127,82 @@ function renderPayload(payload) {
   elements.sendChat.disabled = false;
   elements.copyDraft.disabled = !payload.draft;
   elements.downloadDraft.disabled = !payload.draft;
+}
+
+function payloadFromCase(savedCase) {
+  return {
+    case_id: savedCase.id,
+    session_id: savedCase.session_id,
+    draft: savedCase.draft,
+    checklist: savedCase.checklist,
+    doc_type: savedCase.doc_type,
+    client_name: savedCase.client_name,
+    char_count: savedCase.char_count,
+    filename: savedCase.filename,
+    review_required: true,
+  };
+}
+
+function renderMessages(messages) {
+  elements.chatMessages.innerHTML = "";
+  if (!messages || messages.length === 0) {
+    appendMessage("assistant", "Case loaded. Ask for a revision when ready.");
+    return;
+  }
+  messages.forEach((message) => {
+    appendMessage(message.role === "user" ? "user" : "assistant", message.content);
+  });
+}
+
+async function loadCases() {
+  if (!apiKey()) {
+    elements.caseList.innerHTML = "<div class=\"case-empty\">Enter and save the backend API key first.</div>";
+    return;
+  }
+
+  try {
+    const payload = await getJson("/cases");
+    const cases = payload.cases || [];
+    if (cases.length === 0) {
+      elements.caseList.innerHTML = "<div class=\"case-empty\">No saved cases yet.</div>";
+      return;
+    }
+    elements.caseList.innerHTML = "";
+    cases.forEach((savedCase) => {
+      const button = document.createElement("button");
+      button.className = "case-item";
+      button.type = "button";
+      button.dataset.caseId = savedCase.id;
+      button.innerHTML = `
+        <span class="case-name"></span>
+        <span class="case-meta"></span>
+      `;
+      button.querySelector(".case-name").textContent = savedCase.client_name;
+      button.querySelector(".case-meta").textContent =
+        `${formatDocType(savedCase.doc_type)} · ${formatDate(savedCase.updated_at)}`;
+      button.addEventListener("click", () => loadCase(savedCase.id));
+      elements.caseList.append(button);
+    });
+  } catch (error) {
+    elements.caseList.innerHTML = `<div class="case-empty">${error.message}</div>`;
+  }
+}
+
+async function loadCase(caseId) {
+  try {
+    const payload = await getJson(`/cases/${caseId}`);
+    const savedCase = payload.case;
+    renderPayload(payloadFromCase(savedCase));
+    renderMessages(savedCase.messages);
+    elements.clientName.value = savedCase.client_name;
+    elements.fileName.textContent = savedCase.filename;
+    document.querySelectorAll(".case-item").forEach((item) => {
+      item.classList.toggle("active", item.dataset.caseId === caseId);
+    });
+    setStatus("good", "Case loaded", "Saved draft and checklist are ready.");
+  } catch (error) {
+    setStatus("error", "Load failed", error.message);
+  }
 }
 
 function appendMessage(role, content) {
@@ -144,6 +244,7 @@ async function startReview() {
     elements.chatMessages.innerHTML = "";
     appendMessage("assistant", payload.assistant_message || "Draft and checklist are ready for CA review.");
     setStatus("good", "Draft ready", "Review the draft and checklist before client use.");
+    await loadCases();
   } catch (error) {
     setStatus("error", "Action needed", error.message);
   } finally {
@@ -173,6 +274,7 @@ async function sendRevision(event) {
     renderPayload(payload);
     appendMessage("assistant", payload.assistant_message || "Draft revised for CA review.");
     setStatus("good", "Draft revised", "Review the updated draft.");
+    await loadCases();
   } catch (error) {
     appendMessage("assistant", error.message);
     setStatus("error", "Revision failed", error.message);
@@ -236,7 +338,9 @@ function setupDropZone() {
 elements.saveKey.addEventListener("click", () => {
   localStorage.setItem("ca_agent_api_key", apiKey());
   setStatus("good", "Key saved", "Backend API key saved in this browser.");
+  loadCases();
 });
+elements.refreshCases.addEventListener("click", loadCases);
 elements.startReview.addEventListener("click", startReview);
 elements.chatForm.addEventListener("submit", sendRevision);
 elements.copyDraft.addEventListener("click", copyDraft);
@@ -245,3 +349,4 @@ elements.downloadDraft.addEventListener("click", downloadDraft);
 loadApiKey();
 setupTabs();
 setupDropZone();
+loadCases();

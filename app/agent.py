@@ -159,3 +159,26 @@ def continue_document_session(session_id: str, user_message: str) -> AgentState:
     stored = {**state, **result}
     SESSION_STORE[session_id] = stored
     return stored
+
+
+def restore_document_session(
+    session_id: str,
+    client_name: str,
+    doc_type: str,
+    extracted_text: str,
+    current_draft: str,
+    checklist: str,
+) -> AgentState:
+    """Restore an in-memory LangGraph session from persisted case data."""
+    state: AgentState = {
+        "mode": "draft",
+        "session_id": session_id,
+        "client_name": client_name,
+        "doc_type": doc_type,
+        "extracted_text": extracted_text,
+        "current_draft": current_draft,
+        "draft": current_draft,
+        "checklist": checklist,
+    }
+    SESSION_STORE[session_id] = state
+    return state
